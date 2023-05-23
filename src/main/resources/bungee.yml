@@ -1,0 +1,5 @@
+name: DayCronize
+version: '${project.version}'
+author: WaMel_
+description: "번지코드 서버 간의 데이터를 전송시켜주는 플러그인입니다."
+main: com.wamel.daycronize.proxy.ProxyInitializer
