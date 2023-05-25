@@ -6,7 +6,6 @@ import net.md_5.bungee.api.plugin.Plugin;
 import redis.clients.jedis.Jedis;
 import redis.clients.jedis.JedisPool;
 import redis.clients.jedis.JedisPoolConfig;
-import redis.clients.jedis.JedisPubSub;
 
 public final class ProxyInitializer extends Plugin {
 
@@ -18,9 +17,21 @@ public final class ProxyInitializer extends Plugin {
         instance = this;
 
         JedisPoolConfig jedisPoolConfig = new JedisPoolConfig();
+        jedisPoolConfig.setMaxIdle(0);
+        jedisPoolConfig.setTestOnBorrow(true);
+        jedisPoolConfig.setTestOnReturn(true);
+
         pool = new JedisPool(jedisPoolConfig, "localhost", 6379, 1000 * 15);
 
         getProxy().getPluginManager().registerListener(this, new ProxyEventListener());
+
+        Jedis jedis = pool.getResource();
+
+        jedis.del("DayCronize.PlayerList");
+
+        for (ProxiedPlayer player : getProxy().getPlayers()) {
+            jedis.sadd("DayCronize.PlayerList", player.getName());
+        }
     }
 
     @Override

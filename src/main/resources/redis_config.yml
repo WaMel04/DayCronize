@@ -1,0 +1,8 @@
+# redis server ip
+ip: 172.20.0.158
+
+# redis port
+port: "6379"
+
+# redis password
+password: ""
