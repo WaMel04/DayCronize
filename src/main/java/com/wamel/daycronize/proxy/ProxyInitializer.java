@@ -1,27 +1,41 @@
 package com.wamel.daycronize.proxy;
 
 import com.wamel.daycronize.proxy.listener.ProxyEventListener;
+import net.md_5.bungee.api.connection.ProxiedPlayer;
 import net.md_5.bungee.api.plugin.Plugin;
 import redis.clients.jedis.Jedis;
+import redis.clients.jedis.JedisPool;
+import redis.clients.jedis.JedisPoolConfig;
 import redis.clients.jedis.JedisPubSub;
 
 public final class ProxyInitializer extends Plugin {
 
     private static ProxyInitializer instance;
-    private static Jedis jedis;
+    private static JedisPool pool;
 
     @Override
     public void onEnable() {
         instance = this;
-        jedis = new Jedis("localhost", 6379);
+
+        JedisPoolConfig jedisPoolConfig = new JedisPoolConfig();
+        pool = new JedisPool(jedisPoolConfig, "localhost", 6379, 1000 * 15);
 
         getProxy().getPluginManager().registerListener(this, new ProxyEventListener());
-        initBukkitPacketListenerSubscriber();
+
+        Jedis jedis = pool.getResource();
+
+        jedis.del("DayCronize.PlayerList");
+
+        for (ProxiedPlayer player : getProxy().getPlayers()) {
+            jedis.sadd("DayCronize.PlayerList", player.getName());
+        }
+
+        jedis.close();
     }
 
     @Override
     public void onDisable() {
-        jedis.close();
+        pool.close();
     }
 
     public static ProxyInitializer getInstance() {
@@ -29,28 +43,7 @@ public final class ProxyInitializer extends Plugin {
     }
 
     public static Jedis getJedis() {
-        return jedis;
-    }
-
-    private void initBukkitPacketListenerSubscriber() {
-        getProxy().getScheduler().runAsync(instance, new Runnable() {
-            @Override
-            public void run() {
-                String channelName = "DayCronize_BukkitPacketListenerRegistration";
-                JedisPubSub jedisPubSub = new JedisPubSub() {
-                    @Override
-                    public void onMessage(String channel, String message) {
-                        if (!channel.equalsIgnoreCase(channelName))
-                            return;
-
-                        // port
-                        getProxy().getConsole().sendMessage("§e[DayCronize] " + message + " 포트의 서버와 연결에 성공했습니다.");
-                    }
-                };
-
-                jedis.subscribe(jedisPubSub, channelName);
-            }
-        });
+        return pool.getResource();
     }
 
 }

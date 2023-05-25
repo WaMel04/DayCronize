@@ -31,24 +31,6 @@ public class ProxyDisconnectEvent extends Event {
         return uuid;
     }
 
-    public CompletableFuture<Player> getPlayerFuture() {
-        CompletableFuture<Player> future = new CompletableFuture<>();
-
-        new BukkitRunnable() {
-            @Override
-            public void run() {
-                Player player = Bukkit.getPlayer(UUID.fromString(uuid));
-
-                if (player != null) {
-                    future.complete(player);
-                    cancel();
-                }
-            }
-        }.runTaskTimerAsynchronously(BukkitInitializer.getInstance(), 0, 10);
-
-        return future;
-    }
-
     public @NotNull HandlerList getHandlers() {
         return handlers;
     }

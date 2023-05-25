@@ -12,12 +12,17 @@ public class ProxyEventListener implements Listener {
 
     @EventHandler
     public void onServerConnect(ServerConnectEvent event) {
+        if (event.isCancelled())
+            return;
+
         ProxiedPlayer player = event.getPlayer();
+
+        if (event.getTarget() == null)
+            return;
+
         Integer toServerPort = event.getTarget().getAddress().getPort();
 
-        Jedis jedis = new Jedis("localhost", 6379);
-
-        ProxyInitializer.getInstance().getProxy().broadcast(event.getPlayer().getName() + " " + toServerPort + " " + event.getPlayer().getServer());
+        Jedis jedis = ProxyInitializer.getJedis();
 
         if (event.getPlayer().getServer() == null) {
             // toServerPort | uuid
@@ -28,16 +33,32 @@ public class ProxyEventListener implements Listener {
             // startServerPort | toServerPort | uuid
             jedis.publish("DayCronize_ServerChangeEvent", startServerPort + "|" + toServerPort + "|" + player.getUniqueId().toString());
         }
+
+        jedis.publish("DayCronize_AddPlayerRequest", event.getPlayer().getName());
+
+        jedis.sadd("DayCronize.PlayerList", player.getName());
+
+        jedis.close();
     }
 
     @EventHandler
     public void onProxyDisconnect(PlayerDisconnectEvent event) {
         ProxiedPlayer player = event.getPlayer();
+
+        if (player.getServer() == null)
+            return;
+
         Integer leaveServerPort = player.getServer().getInfo().getAddress().getPort();
 
-        Jedis jedis = new Jedis("localhost", 6379);
+        Jedis jedis = ProxyInitializer.getJedis();
         // leaveServerPort | uuid
         jedis.publish("DayCronize_ProxyDisconnectEvent", leaveServerPort + "|" + player.getUniqueId().toString());
+
+        jedis.publish("DayCronize_RemovePlayerRequest", event.getPlayer().getName());
+
+        jedis.srem("DayCronize.PlayerList", player.getName());
+
+        jedis.close();
     }
 
 }
