@@ -22,22 +22,23 @@ public class ProxyEventListener implements Listener {
 
         Integer toServerPort = event.getTarget().getAddress().getPort();
 
-        Jedis jedis = ProxyInitializer.getJedis();
-
         if (event.getPlayer().getServer() == null) {
-            // toServerPort | uuid | playerName
-            jedis.publish("DayCronize_ProxyConnectEvent", toServerPort + "|" + player.getUniqueId().toString() + "|" + player.getName());
+            try (Jedis jedis = ProxyInitializer.getJedis()) {
+                // toServerPort | uuid | playerName
+                jedis.publish("DayCronize_ProxyConnectEvent", toServerPort + "|" + player.getUniqueId().toString() + "|" + player.getName());
+                jedis.sadd("day_cronize.player_list", player.getName());
+            }
         } else {
             Integer startServerPort = event.getPlayer().getServer().getInfo().getAddress().getPort();
 
             if (startServerPort == toServerPort)
                 return;
 
-            // startServerPort | toServerPort | uuid | playerName
-            jedis.publish("DayCronize_ServerChangeEvent", startServerPort + "|" + toServerPort + "|" + player.getUniqueId().toString() + "|" + player.getName());
+            try (Jedis jedis = ProxyInitializer.getJedis()) {
+                // startServerPort | toServerPort | uuid | playerName
+                jedis.publish("DayCronize_ServerChangeEvent", startServerPort + "|" + toServerPort + "|" + player.getUniqueId().toString() + "|" + player.getName());
+            }
         }
-
-        jedis.close();
     }
 
     @EventHandler
@@ -47,13 +48,14 @@ public class ProxyEventListener implements Listener {
         if (player.getServer() == null)
             return;
 
+
         Integer leaveServerPort = player.getServer().getInfo().getAddress().getPort();
 
-        Jedis jedis = ProxyInitializer.getJedis();
-        // leaveServerPort | uuid | playerName
-        jedis.publish("DayCronize_ProxyDisconnectEvent", leaveServerPort + "|" + player.getUniqueId().toString() + "|" + player.getName());
-
-        jedis.close();
+        try (Jedis jedis = ProxyInitializer.getJedis()) {
+            // leaveServerPort | uuid | playerName
+            jedis.publish("DayCronize_ProxyDisconnectEvent", leaveServerPort + "|" + player.getUniqueId().toString() + "|" + player.getName());
+            jedis.srem("day_cronize.player_list", player.getName());
+        }
     }
 
 }

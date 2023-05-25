@@ -1,16 +1,18 @@
 package com.wamel.daycronize.bukkit;
 
-import com.wamel.daycronize.event.ProxyConnectEvent;
-import com.wamel.daycronize.event.ProxyDisconnectEvent;
-import com.wamel.daycronize.event.ServerChangeEvent;
-import org.bukkit.Bukkit;
+import com.wamel.daycronize.DayCronizeAPI;
+import com.wamel.daycronize.bukkit.subscriber.ProxyConnectEventSubscriber;
+import com.wamel.daycronize.bukkit.subscriber.ProxyDisconnectEventSubscriber;
+import com.wamel.daycronize.bukkit.subscriber.ServerChangeEventSubscriber;
+import com.wamel.daycronize.bukkit.subscriber.Subscriber;
 import org.bukkit.plugin.java.JavaPlugin;
+import org.bukkit.scheduler.BukkitRunnable;
 import redis.clients.jedis.Jedis;
 import redis.clients.jedis.JedisPool;
 import redis.clients.jedis.JedisPoolConfig;
-import redis.clients.jedis.JedisPubSub;
 
 import java.util.ArrayList;
+import java.util.Map;
 
 public class BukkitInitializer extends JavaPlugin {
 
@@ -21,119 +23,43 @@ public class BukkitInitializer extends JavaPlugin {
     public void onEnable() {
         instance = this;
 
+        RedisConfig.load();
+
         JedisPoolConfig jedisPoolConfig = new JedisPoolConfig();
-        pool = new JedisPool(jedisPoolConfig, "localhost", 6379, 1000 * 15);
+        jedisPoolConfig.setMaxIdle(0);
+        jedisPoolConfig.setMaxTotal(300 * 8);
+        jedisPoolConfig.setMaxWaitMillis(-1);
+        jedisPoolConfig.setTestOnBorrow(true);
+        jedisPoolConfig.setTestOnReturn(true);
 
-        Bukkit.getScheduler().runTaskAsynchronously(this, new Runnable() {
-            @Override
-            public void run() {
-                String channelName = "DayCronize_ProxyConnectEvent";
-                JedisPubSub jedisPubSub = new JedisPubSub() {
-                    @Override
-                    public void onMessage(String channel, String message) {
-                        if (channel.equalsIgnoreCase(channelName)) {
-                            // toServerPort | uuid | playerName
-                            String[] splitMessage = message.split("\\|");
-                            String toServerPort = splitMessage[0];
-                            String uuid = splitMessage[1];
-                            String playerName = splitMessage[2];
+        pool = new JedisPool(jedisPoolConfig, RedisConfig.ip, Integer.parseInt(RedisConfig.port), 1000 * 15);
 
-                            ProxyConnectEvent event = new ProxyConnectEvent(Integer.parseInt(toServerPort), uuid, playerName);
-                            Bukkit.getScheduler().runTask(getInstance(), (Runnable) -> Bukkit.getPluginManager().callEvent(event));
-                        }
-                    }
-                };
+        initSubscribers();
 
-                Jedis jedis = pool.getResource();
-
-                jedis.subscribe(jedisPubSub, channelName);
-                jedis.close();
+        try (Jedis jedis = pool.getResource()) {
+            for (String name : jedis.smembers("day_cronize:player_list")) {
+                DayCronizeAPI.playerList.add(name);
             }
-        });
-        Bukkit.getScheduler().runTaskAsynchronously(this, new Runnable() {
-            @Override
-            public void run() {
-                String channelName = "DayCronize_ProxyDisconnectEvent";
-                JedisPubSub jedisPubSub = new JedisPubSub() {
-                    @Override
-                    public void onMessage(String channel, String message) {
-                        if (channel.equalsIgnoreCase(channelName)) {
-                            // leaveServerPort | uuid | playerName
-                            String[] splitMessage = message.split("\\|");
-                            String leaveServerPort = splitMessage[0];
-                            String uuid = splitMessage[1];
-                            String playerName = splitMessage[2];
-
-                            ProxyDisconnectEvent event = new ProxyDisconnectEvent(Integer.parseInt(leaveServerPort), uuid, playerName);
-                            Bukkit.getScheduler().runTask(getInstance(), (Runnable) -> Bukkit.getPluginManager().callEvent(event));
-                        }
-                    }
-                };
-
-                Jedis jedis = pool.getResource();
-
-                jedis.subscribe(jedisPubSub, channelName);
-                jedis.close();
+            for (Map.Entry<String, String> entry : jedis.hgetAll("day_cronize:server_info").entrySet()) {
+                DayCronizeAPI.serverNameMap.put(Integer.parseInt(entry.getKey()), entry.getValue());
             }
-        });
-        Bukkit.getScheduler().runTaskAsynchronously(this, new Runnable() {
-            @Override
-            public void run() {
-                String channelName = "DayCronize_ServerChangeEvent";
-                JedisPubSub jedisPubSub = new JedisPubSub() {
-                    @Override
-                    public void onMessage(String channel, String message) {
-                        if (channel.equalsIgnoreCase(channelName)) {
-                            // startServerPort | toServerPort | uuid | playerName
-                            String[] splitMessage = message.split("\\|");
-                            String startServerPort = splitMessage[0];
-                            String toServerPort = splitMessage[1];
-                            String uuid = splitMessage[2];
-                            String playerName = splitMessage[3];
+        }
+    }
 
-                            ServerChangeEvent event = new ServerChangeEvent(Integer.parseInt(startServerPort), Integer.parseInt(toServerPort), uuid, playerName);
-
-                            Bukkit.getScheduler().runTask(getInstance(), (Runnable) -> Bukkit.getPluginManager().callEvent(event));
-                        }
-                    }
-                };
-
-                Jedis jedis = pool.getResource();
-
-                jedis.subscribe(jedisPubSub, channelName);
-                jedis.close();
+    @Override
+    public void onDisable() {
+        try {
+            for (Subscriber subscriber : subscribers) {
+                subscriber.stop();
             }
-        });
-        Bukkit.getScheduler().runTaskAsynchronously(this, new Runnable() {
-            @Override
-            public void run() {
-                String channelName = "DayCronize_ServerChangeEvent";
-                JedisPubSub jedisPubSub = new JedisPubSub() {
-                    @Override
-                    public void onMessage(String channel, String message) {
-                        if (channel.equalsIgnoreCase(channelName)) {
-                            // startServerPort | toServerPort | uuid
-                            String[] splitMessage = message.split("\\|");
-                            String startServerPort = splitMessage[0];
-                            String toServerPort = splitMessage[1];
-                            String uuid = splitMessage[2];
-                            String playerName = splitMessage[3];
-
-                            if (Integer.parseInt(startServerPort) == Bukkit.getPort() || Integer.parseInt(toServerPort) == Bukkit.getPort()) {
-                                ServerChangeEvent event = new ServerChangeEvent(Integer.parseInt(startServerPort), Integer.parseInt(toServerPort), uuid, playerName);
-
-                                Bukkit.getScheduler().runTask(getInstance(), (Runnable) -> Bukkit.getPluginManager().callEvent(event));
-                            }
-                        }
-                    }
-                };
-
-                Jedis jedis = pool.getResource();
-
-                jedis.subscribe(jedisPubSub, channelName);
-                jedis.close();
+            if (pool != null) {
+                if (!pool.isClosed()) {
+                    pool.close();
+                }
             }
-        });
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
     }
 
     public static BukkitInitializer getInstance() {
@@ -144,5 +70,20 @@ public class BukkitInitializer extends JavaPlugin {
         return pool.getResource();
     }
 
+    ArrayList<Subscriber> subscribers = new ArrayList<>();
+    private void initSubscribers() {
+        subscribers.add(new ProxyConnectEventSubscriber());
+        subscribers.add(new ProxyDisconnectEventSubscriber());
+        subscribers.add(new ServerChangeEventSubscriber());
+
+        for (Subscriber subscriber : subscribers) {
+            new BukkitRunnable() {
+                @Override
+                public void run() {
+                    subscriber.start();
+                }
+            }.runTaskAsynchronously(instance);
+        }
+    }
 
 }
