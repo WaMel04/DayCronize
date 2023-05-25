@@ -21,16 +21,6 @@ public final class ProxyInitializer extends Plugin {
         pool = new JedisPool(jedisPoolConfig, "localhost", 6379, 1000 * 15);
 
         getProxy().getPluginManager().registerListener(this, new ProxyEventListener());
-
-        Jedis jedis = pool.getResource();
-
-        jedis.del("DayCronize.PlayerList");
-
-        for (ProxiedPlayer player : getProxy().getPlayers()) {
-            jedis.sadd("DayCronize.PlayerList", player.getName());
-        }
-
-        jedis.close();
     }
 
     @Override

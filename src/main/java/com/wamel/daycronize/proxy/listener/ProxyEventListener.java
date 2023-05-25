@@ -25,18 +25,17 @@ public class ProxyEventListener implements Listener {
         Jedis jedis = ProxyInitializer.getJedis();
 
         if (event.getPlayer().getServer() == null) {
-            // toServerPort | uuid
-            jedis.publish("DayCronize_ProxyConnectEvent", toServerPort + "|" + player.getUniqueId().toString());
+            // toServerPort | uuid | playerName
+            jedis.publish("DayCronize_ProxyConnectEvent", toServerPort + "|" + player.getUniqueId().toString() + "|" + player.getName());
         } else {
             Integer startServerPort = event.getPlayer().getServer().getInfo().getAddress().getPort();
 
-            // startServerPort | toServerPort | uuid
-            jedis.publish("DayCronize_ServerChangeEvent", startServerPort + "|" + toServerPort + "|" + player.getUniqueId().toString());
+            if (startServerPort == toServerPort)
+                return;
+
+            // startServerPort | toServerPort | uuid | playerName
+            jedis.publish("DayCronize_ServerChangeEvent", startServerPort + "|" + toServerPort + "|" + player.getUniqueId().toString() + "|" + player.getName());
         }
-
-        jedis.publish("DayCronize_AddPlayerRequest", event.getPlayer().getName());
-
-        jedis.sadd("DayCronize.PlayerList", player.getName());
 
         jedis.close();
     }
@@ -51,12 +50,8 @@ public class ProxyEventListener implements Listener {
         Integer leaveServerPort = player.getServer().getInfo().getAddress().getPort();
 
         Jedis jedis = ProxyInitializer.getJedis();
-        // leaveServerPort | uuid
-        jedis.publish("DayCronize_ProxyDisconnectEvent", leaveServerPort + "|" + player.getUniqueId().toString());
-
-        jedis.publish("DayCronize_RemovePlayerRequest", event.getPlayer().getName());
-
-        jedis.srem("DayCronize.PlayerList", player.getName());
+        // leaveServerPort | uuid | playerName
+        jedis.publish("DayCronize_ProxyDisconnectEvent", leaveServerPort + "|" + player.getUniqueId().toString() + "|" + player.getName());
 
         jedis.close();
     }

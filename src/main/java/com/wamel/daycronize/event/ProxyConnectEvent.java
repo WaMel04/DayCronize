@@ -17,10 +17,12 @@ public class ProxyConnectEvent extends Event {
 
     private Integer toServerPort;
     private String uuid;
+    private String playerName;
 
-    public ProxyConnectEvent(Integer toServerPort, String uuid) {
+    public ProxyConnectEvent(Integer toServerPort, String uuid, String playerName) {
         this.toServerPort = toServerPort;
         this.uuid = uuid;
+        this.playerName = playerName;
     }
 
     public Integer getToServerPort() {
@@ -47,6 +49,17 @@ public class ProxyConnectEvent extends Event {
         }.runTaskTimerAsynchronously(BukkitInitializer.getInstance(), 0, 10);
 
         return future;
+    }
+
+    public boolean getIsToServer() {
+        if (Bukkit.getPort() == toServerPort)
+            return true;
+        else
+            return false;
+    }
+
+    public String getPlayerName() {
+        return playerName;
     }
 
     public @NotNull HandlerList getHandlers() {

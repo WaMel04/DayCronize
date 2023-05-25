@@ -17,18 +17,31 @@ public class ProxyDisconnectEvent extends Event {
 
     private Integer leaveServerPort;
     private String uuid;
+    private String playerName;
 
-    public ProxyDisconnectEvent(Integer leaveServerPort, String uuid) {
+    public ProxyDisconnectEvent(Integer leaveServerPort, String uuid, String playerName) {
         this.leaveServerPort = leaveServerPort;
         this.uuid = uuid;
+        this.playerName = playerName;
     }
 
     public Integer getLeaveServerPort() {
         return leaveServerPort;
     }
 
+    public boolean getIsLeaveServer() {
+        if (Bukkit.getPort() == leaveServerPort)
+            return true;
+        else
+            return false;
+    }
+
     public String getUuid() {
         return uuid;
+    }
+
+    public String getPlayerName() {
+        return playerName;
     }
 
     public @NotNull HandlerList getHandlers() {

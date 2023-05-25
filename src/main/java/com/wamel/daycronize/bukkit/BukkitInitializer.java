@@ -17,8 +17,6 @@ public class BukkitInitializer extends JavaPlugin {
     private static BukkitInitializer instance;
     private static JedisPool pool;
 
-    private static ArrayList<String> playerList = new ArrayList<>();
-
     @Override
     public void onEnable() {
         instance = this;
@@ -34,15 +32,14 @@ public class BukkitInitializer extends JavaPlugin {
                     @Override
                     public void onMessage(String channel, String message) {
                         if (channel.equalsIgnoreCase(channelName)) {
-                            // toServerPort | uuid
+                            // toServerPort | uuid | playerName
                             String[] splitMessage = message.split("\\|");
                             String toServerPort = splitMessage[0];
                             String uuid = splitMessage[1];
+                            String playerName = splitMessage[2];
 
-                            if (Integer.parseInt(toServerPort) == Bukkit.getPort()) {
-                                ProxyConnectEvent event = new ProxyConnectEvent(Integer.parseInt(toServerPort), uuid);
-                                Bukkit.getScheduler().runTask(getInstance(), (Runnable) -> Bukkit.getPluginManager().callEvent(event));
-                            }
+                            ProxyConnectEvent event = new ProxyConnectEvent(Integer.parseInt(toServerPort), uuid, playerName);
+                            Bukkit.getScheduler().runTask(getInstance(), (Runnable) -> Bukkit.getPluginManager().callEvent(event));
                         }
                     }
                 };
@@ -61,15 +58,42 @@ public class BukkitInitializer extends JavaPlugin {
                     @Override
                     public void onMessage(String channel, String message) {
                         if (channel.equalsIgnoreCase(channelName)) {
-                            // leaveServerPort | uuid
+                            // leaveServerPort | uuid | playerName
                             String[] splitMessage = message.split("\\|");
                             String leaveServerPort = splitMessage[0];
                             String uuid = splitMessage[1];
+                            String playerName = splitMessage[2];
 
-                            if (Integer.parseInt(leaveServerPort) == Bukkit.getPort()) {
-                                ProxyDisconnectEvent event = new ProxyDisconnectEvent(Integer.parseInt(leaveServerPort), uuid);
-                                Bukkit.getScheduler().runTask(getInstance(), (Runnable) -> Bukkit.getPluginManager().callEvent(event));
-                            }
+                            ProxyDisconnectEvent event = new ProxyDisconnectEvent(Integer.parseInt(leaveServerPort), uuid, playerName);
+                            Bukkit.getScheduler().runTask(getInstance(), (Runnable) -> Bukkit.getPluginManager().callEvent(event));
+                        }
+                    }
+                };
+
+                Jedis jedis = pool.getResource();
+
+                jedis.subscribe(jedisPubSub, channelName);
+                jedis.close();
+            }
+        });
+        Bukkit.getScheduler().runTaskAsynchronously(this, new Runnable() {
+            @Override
+            public void run() {
+                String channelName = "DayCronize_ServerChangeEvent";
+                JedisPubSub jedisPubSub = new JedisPubSub() {
+                    @Override
+                    public void onMessage(String channel, String message) {
+                        if (channel.equalsIgnoreCase(channelName)) {
+                            // startServerPort | toServerPort | uuid | playerName
+                            String[] splitMessage = message.split("\\|");
+                            String startServerPort = splitMessage[0];
+                            String toServerPort = splitMessage[1];
+                            String uuid = splitMessage[2];
+                            String playerName = splitMessage[3];
+
+                            ServerChangeEvent event = new ServerChangeEvent(Integer.parseInt(startServerPort), Integer.parseInt(toServerPort), uuid, playerName);
+
+                            Bukkit.getScheduler().runTask(getInstance(), (Runnable) -> Bukkit.getPluginManager().callEvent(event));
                         }
                     }
                 };
@@ -93,60 +117,10 @@ public class BukkitInitializer extends JavaPlugin {
                             String startServerPort = splitMessage[0];
                             String toServerPort = splitMessage[1];
                             String uuid = splitMessage[2];
+                            String playerName = splitMessage[3];
 
                             if (Integer.parseInt(startServerPort) == Bukkit.getPort() || Integer.parseInt(toServerPort) == Bukkit.getPort()) {
-                                ServerChangeEvent event = new ServerChangeEvent(Integer.parseInt(startServerPort), Integer.parseInt(toServerPort), uuid);
-
-                                Bukkit.getScheduler().runTask(getInstance(), (Runnable) -> Bukkit.getPluginManager().callEvent(event));
-                            }
-                        }
-                    }
-                };
-
-                Jedis jedis = pool.getResource();
-
-                jedis.subscribe(jedisPubSub, channelName);
-                jedis.close();
-            }
-        });
-        Bukkit.getScheduler().runTaskAsynchronously(this, new Runnable() {
-            @Override
-            public void run() {
-                String channelName = "DayCronize_AddPlayerRequest";
-                JedisPubSub jedisPubSub = new JedisPubSub() {
-                    @Override
-                    public void onMessage(String channel, String message) {
-                        if (channel.equalsIgnoreCase(channelName)) {
-                            // playerName
-                            if (!playerList.contains(message)) {
-                                playerList.add(message);
-                            }
-                        }
-                    }
-                };
-
-                Jedis jedis = pool.getResource();
-
-                jedis.subscribe(jedisPubSub, channelName);
-                jedis.close();
-            }
-        });
-        Bukkit.getScheduler().runTaskAsynchronously(this, new Runnable() {
-            @Override
-            public void run() {
-                String channelName = "DayCronize_ServerChangeEvent";
-                JedisPubSub jedisPubSub = new JedisPubSub() {
-                    @Override
-                    public void onMessage(String channel, String message) {
-                        if (channel.equalsIgnoreCase(channelName)) {
-                            // startServerPort | toServerPort | uuid
-                            String[] splitMessage = message.split("\\|");
-                            String startServerPort = splitMessage[0];
-                            String toServerPort = splitMessage[1];
-                            String uuid = splitMessage[2];
-
-                            if (Integer.parseInt(startServerPort) == Bukkit.getPort() || Integer.parseInt(toServerPort) == Bukkit.getPort()) {
-                                ServerChangeEvent event = new ServerChangeEvent(Integer.parseInt(startServerPort), Integer.parseInt(toServerPort), uuid);
+                                ServerChangeEvent event = new ServerChangeEvent(Integer.parseInt(startServerPort), Integer.parseInt(toServerPort), uuid, playerName);
 
                                 Bukkit.getScheduler().runTask(getInstance(), (Runnable) -> Bukkit.getPluginManager().callEvent(event));
                             }
@@ -168,10 +142,6 @@ public class BukkitInitializer extends JavaPlugin {
 
     public static Jedis getJedis() {
         return pool.getResource();
-    }
-
-    public static ArrayList<String> getPlayerList() {
-        return playerList;
     }
 
 

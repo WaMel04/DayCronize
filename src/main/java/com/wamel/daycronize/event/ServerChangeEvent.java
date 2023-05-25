@@ -18,11 +18,13 @@ public class ServerChangeEvent extends Event {
     private Integer startServerPort;
     private Integer toServerPort;
     private String uuid;
+    private String playerName;
 
-    public ServerChangeEvent(Integer startServerPort, Integer toServerPort, String uuid) {
+    public ServerChangeEvent(Integer startServerPort, Integer toServerPort, String uuid, String playerName) {
         this.startServerPort = startServerPort;
         this.toServerPort = toServerPort;
         this.uuid = uuid;
+        this.playerName = playerName;
     }
 
     public Integer getStartServerPort() {
@@ -35,6 +37,10 @@ public class ServerChangeEvent extends Event {
 
     public String getUuid() {
         return uuid;
+    }
+
+    public String getPlayerName() {
+        return playerName;
     }
 
     public CompletableFuture<Player> getPlayerFuture() {
